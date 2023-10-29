@@ -12,6 +12,22 @@ from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from typing_extensions import Annotated
 
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from . import schemas
+
+# DATABASE
+# mongo_uri = f"mongodb://root:password@localhost:27017/database_test"
+
+# sqlalqemy with mariadb connection
+mariadb_uri = f"mariadb+mariadbconnector://root:password@localhost:3306/database_test"
+mariadb_engine = create_engine(mariadb_uri, pool_size=5, pool_recycle=1800)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=mariadb_engine)
+
+Base = declarative_base()
+
 fake_users_db = {
     "johndoe": {
         "username": "johndoe",
@@ -79,6 +95,14 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
+# create/ sign-up
+@app.post("/users/", response_model=schemas.User)
+def create_user(user: schemas.UserCreate, db: Session = SessionLocal):
+    db_user = schemas.get_user_by_email(db, email=user.email)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    return schemas.create_user(db=db, user=user)
+
 
 @app.post("/token")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -98,7 +122,7 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
 # -----------------
-# # database config
+# database config
 # URL = "mongodb://localhost:27017" #mongo
 # CLIENT = AsyncIOMotorClient(URL)
 # DATABASE = CLIENT["auth_example"]

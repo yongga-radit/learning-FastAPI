@@ -1,0 +1,4 @@
+SQLAlchemy==1.4.36
+PyMySQL==1.0.2
+mysql-connector-python==8.0.29
+mariadb==1.0.11

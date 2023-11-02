@@ -2,6 +2,7 @@ import datetime as dt
 import sqlalchemy as sql
 # from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 import sqlalchemy.orm as orm
+import passlib.hash as _hash
 
 from src import database as db
 
@@ -18,6 +19,9 @@ class User(db.Base):
 
     posts = orm.relationship("Post", back_populates="owner")
 
+    def verify_password(self, password: str):
+        return _hash.bcrypt.verify(password, self.hashed_password)
+
 class Post(db.Base):
     __tablename__ = "posts"
 
@@ -26,6 +30,8 @@ class Post(db.Base):
     content = sql.Column(sql.String, index=True)
     owner_id = sql.Column(sql.Integer, sql.ForeignKey("users.id"))
     date_created = sql.Column(sql.DateTime, default=dt.datetime.utcnow)
-    date_last_modified = sql.Column(sql.DateTime, default=dt.datetime.utcnow)
+    date_last_modified = sql.Column(sql.DateTime, default=dt.datetime.utcnow, 
+                                    onupdate=dt.datetime.utcnow
+                                    )
 
     owner = orm.relationship("User", back_populates="posts")

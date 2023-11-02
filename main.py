@@ -1,5 +1,6 @@
 from typing import List
 import fastapi as fa
+import fastapi.security as secure
 import sqlalchemy.orm as orm
 from src import services as serve, schemas as schema
 
@@ -7,15 +8,34 @@ app = fa.FastAPI()
 
 serve.create_database()
 
+
+
 # 5
 @app.post("/users/", response_model=schema.User)
-def create_user(user: schema.UserCreate, data: orm.Session = fa.Depends(serve.get_db)):
-    db_user = serve.get_user_by_email(db=data, email=user.email)
+async def create_user(
+    user: schema.UserCreate, 
+    db: orm.Session = fa.Depends(serve.get_db)
+):
+    db_user = await serve.get_user_by_email(db=db, email=user.email)
     if db_user:
         raise fa.HTTPException(
-            status_code=400, detail="Oopsie! The email still in use."
+            status_code=400, detail="Email is already exist."
         )
-    return serve.create_user(db=data, user=user)
+    return await serve.create_user(db=db, user=user)
+
+@app.post("/api/token")
+async def generate_token(
+    form_data: secure.OAuth2PasswordRequestForm = fa.Depends(), 
+    db: orm.Session = fa.Depends(serve.get_db)
+):
+    user = await serve.authenticate_user(form_data.username, 
+                                         form_data.password, db
+                                         )
+
+    if not user:
+        raise fa.HTTPException(401, "Invalid Credentials.")
+
+    return await serve.create_token(user)
 
 # 10
 @app.get("/users/", response_model=List[schema.User])
@@ -28,9 +48,16 @@ def read_users(
     users = serve.get_users(db=db, skip=skip, limit=limit)
     return users
 
+@app.get("/api/users/me", response_model=schema.User)
+async def get_user(user: schema.User = fa.Depends(serve.get_current_user)):
+    return user
+
 @app.get("/users/{user_id}", response_model=schema.User)
-def read_user(user_id: int, db: orm.Session = fa.Depends(serve.get_db)):
-    db_user = serve.get_user(db=db, user_id=user_id)
+def read_user(
+    user_id: int, 
+    db: orm.Session = fa.Depends(serve.get_db)
+):
+    db_user = serve.get_current_user(db=db, user_id=user_id)
     if db_user is None:
         raise fa.HTTPException(status_code=404, detail="sorry this user does not exist.")
     return db_user
@@ -41,7 +68,7 @@ def create_post(
     post: schema.PostCreate, 
     db: orm.Session = fa.Depends(serve.get_db)
 ):
-    db_user = serve.get_user(db=db, user_id=user_id)
+    db_user = serve.get_current_user(db=db, user_id=user_id)
     if db_user is None:
         raise fa.HTTPException(status_code=404, detail="sorry this user does not exist.")
     return serve.create_post(db=db, post=post, user_id=user_id)
@@ -53,19 +80,25 @@ def read_posts(
     limit: int = 10, 
     db: orm.Session = fa.Depends(serve.get_db)
 ):
-    posts = serve.get_users(db=db, skip=skip, limit=limit)
+    posts = serve.get_posts(db=db, skip=skip, limit=limit)
     return posts
 
 # show spesific post
 @app.get("/posts/{post_id}", response_model=schema.Post)
-def read_post(post_id: int, db: orm.Session = fa.Depends(serve.get_db)):
+def read_post(
+    post_id: int, 
+    db: orm.Session = fa.Depends(serve.get_db)
+):
     post = serve.get_post(db=db, post_id=post_id)
     if post is None:
         raise fa.HTTPException(status_code=404, detail="sorry this post does not exist")
     return post
 
 @app.delete("/posts/{post_id}")
-def delete_post(post_id: int, db: orm.Session = fa.Depends(serve.get_db)):
+def delete_post(
+    post_id: int, 
+    db: orm.Session = fa.Depends(serve.get_db)
+):
     serve.delete_post(db=db, post_id=post_id)
     return {"message": f"successfullt deleted post with id: {post_id}"}
 

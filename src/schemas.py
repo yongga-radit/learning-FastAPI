@@ -2,7 +2,7 @@ from typing import List
 import datetime as dt
 import pydantic as pd
 
-# 4
+# 4 
 class _PostBase(pd.BaseModel):
     title: str
     content: str
@@ -23,7 +23,8 @@ class _UserBase(pd.BaseModel):
     email: str
 
 class UserCreate(_UserBase):
-    password: str
+    hashed_password: str
+    role: str
 
 # {
 #     "email": "john@gmail.com",
@@ -34,7 +35,7 @@ class UserCreate(_UserBase):
 
 class User(_UserBase):
     id: int
-    is_active: int
+    is_active: bool
     posts: List[Post] = []
 
     class Config:
